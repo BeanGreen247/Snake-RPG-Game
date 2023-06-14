@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Snake RPG Game</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11.1.2/dist/sweetalert2.min.css">
+  <style>
+    body {
+  background-color: black;
+  color: yellow;
+  font-family: "Pixel Font", monospace;
+  margin: 0; /* Added to remove default body margin */
+}
+
+canvas {
+  border: 1px solid yellow;
+}
+
+#gameContainer {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: calc(100vh - 200px); /* Adjusted to leave some space at the bottom */
+  margin-top: 50px; /* Adjusted margin to move the game closer to the top */
+}
+
+#gameCanvas {
+  margin: 0 auto; /* Adjusted margin to center the game canvas */
+  display: block;
+}
+
+#hudContainer {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-direction: column;
+  position: absolute;
+  top: calc(100vh - 150px); /* Adjusted position to move HUD closer to the game */
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+#score,
+#level,
+#experience {
+  font-size: 16px;
+  margin: 5px 0; /* Adjusted margin for tighter spacing */
+}
+
+#experience-bar-container {
+  width: 200px;
+  height: 20px;
+  background-color: yellow;
+  overflow: hidden;
+  margin-top: 5px; /* Adjusted margin for tighter spacing */
+}
+
+#experience-bar {
+  height: 100%;
+  background-color: green;
+  transition: width 0.3s ease-in-out;
+}
+
+#copyright {
+  font-size: 12px;
+  text-align: center;
+  margin-top: -15px; /* Adjusted margin to separate HUD and copyright */
+}
+
+/* Custom styles for SweetAlert2 */
+.swal2-container {
+  font-family: "Pixel Font", monospace !important;
+}
+
+.swal2-popup {
+  background-color: black !important;
+  color: yellow !important;
+  border-color: red !important;
+  box-shadow: 0 0 10px red !important;
+}
+
+.swal2-title {
+  color: yellow !important;
+}
+
+.swal2-icon {
+  color: yellow !important;
+}
+
+.swal2-confirm {
+  background-color: yellow !important;
+  color: black !important;
+  font-family: "Pixel Font", monospace !important;
+}
+
+.swal2-cancel {
+  background-color: transparent !important;
+  border-color: yellow !important;
+  color: yellow !important;
+}
+
+.swal2-confirm:hover {
+  background-color: yellow !important;
+  color: black !important;
+}
+
+.swal2-cancel:hover {
+  background-color: transparent !important;
+  border-color: yellow !important;
+  color: yellow !important;
+}
+
+  </style>
+</head>
+<body>
+  <div id="gameContainer">
+    <canvas id="gameCanvas" width="400" height="400"></canvas>
+  </div>
+
+  <div id="hudContainer">
+    <div id="score"></div>
+    <div id="level"></div>
+    <div id="experience"></div>
+    <div id="experience-bar-container">
+      <div id="experience-bar"></div>
+    </div>
+  </div>
+
+  <div id="copyright">
+    &copy; <span id="currentYear"></span> BeanGreen247 | <a href="https://github.com/BeanGreen247">GitHub</a>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11.1.2/dist/sweetalert2.all.min.js"></script>
+  <script>
+    document.addEventListener("DOMContentLoaded", function() {
+      // Initialize game variables
+      let score = 0;
+      let level = 1;
+      let experience = 0;
+      let maxExperience = 100;
+
+      // Snake-related variables
+      let snake = [{ x: 0, y: 0 }];
+      let snakeLength = 1;
+      let direction = "right";
+
+      // Game canvas and context
+      const canvas = document.getElementById("gameCanvas");
+      const context = canvas.getContext("2d");
+
+      // Food variable
+      let food = {
+        x: Math.floor(Math.random() * (canvas.width / 10)),
+        y: Math.floor(Math.random() * (canvas.height / 10))
+      };
+
+      // Game loop
+      function gameLoop() {
+        // Clear the canvas
+        context.clearRect(0, 0, canvas.width, canvas.height);
+
+        // Update snake position
+        updateSnake();
+
+        // Check for collisions and handle game logic
+        if (checkCollision()) {
+          gameOver();
+          return;
+        }
+
+        // Check if the snake ate the food
+        if (snake[0].x === food.x && snake[0].y === food.y) {
+          // Increase the score and snake length
+          score++;
+          snakeLength++;
+          // Generate new food location
+          generateFood();
+          // Gain experience points
+          gainExperience(10);
+        }
+
+        // Draw snake, food, and other game elements
+        drawSnake();
+        drawFood();
+
+        // Update the score, level, and experience display
+        updateHUD();
+
+        // Check for level up
+        if (experience >= maxExperience) {
+          levelUp();
+        }
+
+        // Request the next frame
+        setTimeout(gameLoop, 100); // Adjust the delay (in milliseconds) to control the speed
+      }
+
+      // Function to update snake position
+      function updateSnake() {
+        if (snake.length === 0) {
+          return; // No need to update the snake if it's empty
+        }
+        
+        const head = { x: snake[0].x, y: snake[0].y };
+
+        // Update head position based on the direction
+        if (direction === "up") head.y--;
+        else if (direction === "down") head.y++;
+        else if (direction === "left") head.x--;
+        else if (direction === "right") head.x++;
+
+        // Add the new head to the snake
+        snake.unshift(head);
+
+        // Remove the tail if the snake hasn't eaten food
+        if (snake.length > snakeLength) {
+          snake.pop();
+        }
+      }
+
+      // Function to check for collisions
+      function checkCollision() {
+        if (snake.length === 0) {
+          return false; // Snake is empty, no collision
+        }
+
+        const head = snake[0];
+
+        // Check for collision with walls
+        if (
+          head.x < 0 ||
+          head.x >= canvas.width / 10 ||
+          head.y < 0 ||
+          head.y >= canvas.height / 10
+        ) {
+          return true;
+        }
+
+        // Check for collision with the snake's body
+        for (let i = 1; i < snake.length; i++) {
+          if (head.x === snake[i].x && head.y === snake[i].y) {
+            return true;
+          }
+        }
+
+        return false;
+      }
+
+      // Function to draw the snake
+      function drawSnake() {
+        for (let i = 0; i < snake.length; i++) {
+          const { x, y } = snake[i];
+          context.fillStyle = i === 0 ? "green" : "lightgreen";
+          context.fillRect(x * 10, y * 10, 10, 10);
+        }
+      }
+
+      // Function to draw the food
+      function drawFood() {
+        context.fillStyle = "red";
+        context.fillRect(food.x * 10, food.y * 10, 10, 10);
+      }
+
+      // Function to generate new food location
+      function generateFood() {
+        food.x = Math.floor(Math.random() * (canvas.width / 10));
+        food.y = Math.floor(Math.random() * (canvas.height / 10));
+      }
+
+      // Function to update the score, level, and experience display
+      function updateHUD() {
+        const scoreElement = document.getElementById("score");
+        scoreElement.innerText = "Score: " + score;
+        
+        const levelElement = document.getElementById("level");
+        levelElement.innerText = "Level: " + level;
+        
+        const expElement = document.getElementById("experience");
+        expElement.innerText = "Experience: " + experience + "/" + maxExperience;
+
+        // Calculate the width of the experience bar
+        const expBarElement = document.getElementById("experience-bar");
+        const expPercent = (experience / maxExperience) * 100;
+        expBarElement.style.width = Math.min(expPercent, 100) + "%";
+      }
+
+      // Function to handle leveling up
+      function levelUp() {
+        level++;
+        experience = 0;
+        maxExperience *= 1.5; // Increase the experience required for the next level
+        // Additional level up logic, e.g., increasing snake speed, adding abilities, etc.
+      }
+
+      // Function to handle gaining experience points
+      function gainExperience(points) {
+        experience += points;
+      }
+
+      // Function to handle user input
+      document.addEventListener("keydown", handleKeyPress);
+
+      function handleKeyPress(event) {
+        const key = event.key.toLowerCase();
+
+        if (key === "w" || key === "arrowup") {
+          if (direction !== "down") direction = "up";
+        } else if (key === "s" || key === "arrowdown") {
+          if (direction !== "up") direction = "down";
+        } else if (key === "a" || key === "arrowleft") {
+          if (direction !== "right") direction = "left";
+        } else if (key === "d" || key === "arrowright") {
+          if (direction !== "left") direction = "right";
+        }
+      }
+
+    // Function to handle game over
+    function gameOver() {
+      // Display a game over message using SweetAlert2 with custom styles
+      Swal.fire({
+        title: "Game Over!",
+        icon: "error",
+        showConfirmButton: true,
+        allowOutsideClick: false,
+        customClass: {
+          container: "game-over-container",
+          title: "game-over-title",
+          icon: "game-over-icon",
+          confirmButton: "game-over-confirm-button"
+        }
+      }).then(() => {
+        // Reload the page to restart the game
+        location.reload();
+      });
+    }
+      // Start the game loop
+      gameLoop();
+
+      // Update the current year in the copyright
+      const currentYearElement = document.getElementById("currentYear");
+      currentYearElement.innerText = new Date().getFullYear();
+    });
+  </script>
+</body>
+</html>
